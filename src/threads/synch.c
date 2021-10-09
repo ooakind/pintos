@@ -336,3 +336,16 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
 }
+
+
+//Added
+/*
+  Comparison function for ready_list.
+  Return true if list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority
+*/
+bool sema_priority_list_less_func (const struct list_elem *a, const struct list_elem *a, void *aux U UNUSED)
+{
+  struct list_elem *a_thread_elem = list_begin(&(list_entry(a, struct semaphore_elem, elem)->semaphore.waiters));
+  struct list_elem *b_thread_elem = list_begin(&(list_entry(b, struct semaphore_elem, elem)->semaphore.waiters));
+  return list_entry(a_thread_elem, struct thread, elem)->priority; < list_entry(b_thread_elem, struct thread, elem)->priority;
+}

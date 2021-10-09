@@ -138,4 +138,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+//Added
+bool priority_list_less_func (const struct list_elem *a, const struct list_elem *a, void *aux UNUSED);
+
 #endif /* threads/thread.h */
