@@ -201,6 +201,9 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  //Modified
+  check_preemption();
+
   return tid;
 }
 
@@ -237,7 +240,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  //Modified
+  list_insert_ordered (&ready_list, &t->elem, priority_list_less_func, 0);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -308,7 +312,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    //Modified
+    list_insert_ordered (&ready_list, &cur->elem, priority_list_less_func, 0);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -589,7 +594,25 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
   Comparison function for ready_list.
   Return true if list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority
 */
-bool priority_list_less_func (const struct list_elem *a, const struct list_elem *a, void *aux UNUSED)
+bool priority_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   return list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority;
+}
+
+/*
+  Compare the priorities of current running thread and ready-state threads.
+*/
+void check_preemption(void)
+{
+  struct thread *cur = running_thread();
+
+  if (list_empty(&ready_list))
+  {
+    return;
+  }
+
+  struct thread *highest = list_entry(list_begin(&ready_list), struct thread, elem);
+  if (cur->priority < highest->priority) {
+    thread_yield();
+  }
 }

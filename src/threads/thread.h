@@ -139,6 +139,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 //Added
-bool priority_list_less_func (const struct list_elem *a, const struct list_elem *a, void *aux UNUSED);
+bool priority_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void check_preemption(void);
 
 #endif /* threads/thread.h */

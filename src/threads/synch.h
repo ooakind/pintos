@@ -3,6 +3,7 @@
 
 #include <list.h>
 #include <stdbool.h>
+#include <debug.h>  //Added
 
 /* A counting semaphore. */
 struct semaphore 
@@ -49,6 +50,6 @@ void cond_broadcast (struct condition *, struct lock *);
 #define barrier() asm volatile ("" : : : "memory")
 
 //Added
-bool sema_priority_list_less_func (const struct list_elem *a, const struct list_elem *a, void *aux U UNUSED)
+bool sema_priority_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 #endif /* threads/synch.h */
