@@ -104,6 +104,9 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    /* Project1: Alarm clock */
+    int64_t ticks_to_wakeup;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -148,5 +151,10 @@ bool cmp_priority_donator (const struct list_elem *a, const struct list_elem *b,
 void check_preemption(void);
 void donate(void);
 void donation_reset(void);
+
+/* Added for Alarm clock. */
+int64_t get_tick_to_wakeup_first(void);
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
 
 #endif /* threads/thread.h */
