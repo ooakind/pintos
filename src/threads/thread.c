@@ -71,6 +71,74 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* Added for Alarm clock. */
+static struct list sleep_list;
+static int64_t tick_to_wakeup_first;
+
+void update_tick_to_wakeup_first(int64_t ticks);
+void init_tick_to_wakeup_first(void);
+
+/* Save ticks to wake up first for an efficient alarm clock. */
+void
+update_tick_to_wakeup_first(int64_t ticks)
+{
+  if (ticks < tick_to_wakeup_first)
+    tick_to_wakeup_first = ticks;
+}
+
+/* A getter for tick_to_wakeup_first. */
+int64_t
+get_tick_to_wakeup_first()
+{
+  return tick_to_wakeup_first;
+}
+
+/* Make current thread sleep until ticks. */
+void
+thread_sleep(int64_t ticks)
+{
+  enum intr_level old_level = intr_disable ();
+
+  struct thread *cur = thread_current ();
+  if (cur != idle_thread)
+  {
+    cur->ticks_to_wakeup = ticks;
+    list_push_back (&sleep_list, &cur->elem);
+    update_tick_to_wakeup_first (ticks);
+    thread_block ();
+  }
+
+  intr_set_level (old_level);
+}
+
+/* Wake up threads that have less ticks_to_wakeup than ticks. */
+void
+thread_wakeup(int64_t ticks)
+{
+  struct list_elem *e;
+  for (e = list_begin (&sleep_list); e != list_end (&sleep_list);)
+  {
+    struct thread *t = list_entry (e, struct thread, elem);
+    if (t->ticks_to_wakeup <= ticks)
+    {
+      e = list_remove (e);
+      thread_unblock (t);
+    }else
+    {
+      e = list_next(e);
+      update_tick_to_wakeup_first (t->ticks_to_wakeup);
+    }
+  }
+}
+
+/* Initialize tick_to_wakeup_first to INT64_MAX. 
+   At the first time get_tick_to_wakeup_first() is called, tick_to_wakeup_first must be updated.  */
+void
+init_tick_to_wakeup_first(void)
+{
+  tick_to_wakeup_first = INT64_MAX;
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -92,6 +160,8 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
+  init_tick_to_wakeup_first();
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
