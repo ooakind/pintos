@@ -89,6 +89,10 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int org_priority;                   //Modified. Original priority, which is not donated.
+    struct lock *waiting_lock;          //Modified. Lock that this thread is waiting for.
+    struct list donator;                //Modified. List of donator thread.
+    struct list_elem donator_elem;      //Modified. list_elem for donator.
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -139,7 +143,10 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 //Added
-bool priority_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_priority_ready_list (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_priority_donator (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void check_preemption(void);
+void donate(void);
+void donation_reset(void);
 
 #endif /* threads/thread.h */

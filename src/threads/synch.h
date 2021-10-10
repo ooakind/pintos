@@ -50,6 +50,6 @@ void cond_broadcast (struct condition *, struct lock *);
 #define barrier() asm volatile ("" : : : "memory")
 
 //Added
-bool sema_priority_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_priority_waiters (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 #endif /* threads/synch.h */
