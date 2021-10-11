@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include <fixed_point_real_arithmetic.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -59,6 +60,9 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+/* Added for Advanced Scheduler. */
+static int load_avg;
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -70,6 +74,10 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+
+/* Added for Advanced Scheduler. */
+int advanced_cal_priority(int recent_cpu, int nice);
+int advanced_cal_recent_cpu(int recent_cpu, int nice);
 
 /* Added for Alarm clock. */
 static struct list sleep_list;
@@ -162,12 +170,15 @@ thread_init (void)
   list_init (&all_list);
   list_init (&sleep_list);
   init_tick_to_wakeup_first();
+  init_load_avg();
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->nice = 0;
+  initial_thread->recent_cpu = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -411,13 +422,16 @@ void
 thread_set_priority (int new_priority) 
 {
   //Modified
-  struct thread *cur = thread_current();
-  cur->org_priority = new_priority;
-  cur->priority = new_priority;
+  if (!thread_mlfqs)
+  {
+    struct thread *cur = thread_current();
+    cur->org_priority = new_priority;
+    cur->priority = new_priority;
 
-  donation_reset();
-  donate();
-  check_preemption();
+    donation_reset();
+    donate();
+    check_preemption();
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -427,35 +441,147 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
+/* ========== Added for Advanced Scheduler. =========== */
+/* recent_cpu, load_avg is in 17.14 format. */
+/* Initialized load_avg to 0. */
+void
+init_load_avg()
+{
+  load_avg = 0;
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
-  /* Not yet implemented. */
+  enum intr_level old_level = intr_disable (); 
+  struct thread *cur = thread_current();
+  cur->nice = nice;
+  int new_priority = advanced_cal_priority(cur->recent_cpu, cur->nice);
+  cur->priority = new_priority;
+  cur->org_priority = new_priority;
+  intr_set_level (old_level);
+
+  check_preemption();
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  enum intr_level old_level = intr_disable ();
+  struct thread *cur = thread_current ();
+  int current_nice = cur->nice;
+  intr_set_level (old_level);
+
+  return current_nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  enum intr_level old_level = intr_disable ();
+  int load_avg_conv = conv_fp_to_int(mul_fp_int(load_avg, 100), NEAREST);
+  intr_set_level (old_level);
+
+  return load_avg_conv;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  enum intr_level old_level = intr_disable ();
+  struct thread *cur = thread_current ();
+  int current_recent_cpu = conv_fp_to_int(mul_fp_int(cur->recent_cpu, 100), NEAREST);
+  intr_set_level (old_level);
+
+  return current_recent_cpu;
+}
+
+/* Calculate and return priority using params. 
+   It should be called with interrupt disabled. 
+ */
+int
+advanced_cal_priority(int recent_cpu, int nice)
+{
+  return conv_fp_to_int(sub_fp_int(sub_fp_fp(conv_int_to_fp(PRI_MAX), div_fp_int(recent_cpu, 4)), nice * 2), NEAREST);
+}
+
+/* Calculate and return recent_cpu using params.
+   It should be called with interrupt disabled. 
+ */
+int
+advanced_cal_recent_cpu(int recent_cpu, int nice)
+{
+  int twice_load_avg = mul_fp_int(load_avg, 2);
+  return add_fp_int(mul_fp_fp(div_fp_fp(twice_load_avg, add_fp_int(twice_load_avg, 1)), recent_cpu), nice);
+}
+
+/* Calculate and set load_avg. */
+void
+advanced_cal_load_avg()
+{
+  struct thread *cur = thread_current ();
+  int num_ready_threads = list_size(&ready_list);
+  /* Add 1 to cound running thread. */
+  num_ready_threads = cur != idle_thread ? num_ready_threads + 1 : num_ready_threads;
+  int raw_load_avg = div_fp_int(add_fp_int(mul_fp_int(load_avg, 59), num_ready_threads), 60); 
+  load_avg = raw_load_avg > 0 ? raw_load_avg : 0;
+}
+
+/* Increment recent_cpu. */
+void
+advanced_increment_recent_cpu()
+{
+  struct thread *cur = thread_current ();
+  if (cur != idle_thread)
+  {
+    cur->recent_cpu = add_fp_int(cur->recent_cpu, 1);
+  }
+}
+
+/* Calculate recent_cpu for all threads. */
+void
+thread_cal_recent_cpu()
+{
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+        e = list_next (e))
+      {
+        struct thread *t = list_entry (e, struct thread, allelem);
+        if (t != idle_thread)
+        {
+          t->recent_cpu = advanced_cal_recent_cpu(t->recent_cpu, t->nice);
+        }
+      }
+}
+
+/* Calculate priority for all threads.
+   After updating priority, sort ready_list by priority.
+ */
+void
+thread_cal_priority()
+{
+  if (thread_ticks == TIME_SLICE)
+  {
+    struct list_elem *e;
+
+    for (e = list_begin (&all_list); e != list_end (&all_list);
+          e = list_next (e))
+        {
+          struct thread *t = list_entry (e, struct thread, allelem);
+          if (t != idle_thread)
+          {
+            int new_priority = advanced_cal_priority(t->recent_cpu, t->nice);
+            t->priority = new_priority;
+            t->org_priority = new_priority; 
+          }
+        }
+    list_sort(&ready_list, cmp_priority_ready_list, 0);
+    }
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -550,6 +676,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->waiting_lock = NULL;
   list_init(&t->donator);
   //
+
+  /* Inherit nice and recent_cpu from parent thread. */
+  if (t != idle_thread)
+  {
+    struct thread *cur = running_thread ();
+    t->nice = cur->nice;
+    t->recent_cpu = cur->recent_cpu;
+  }
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

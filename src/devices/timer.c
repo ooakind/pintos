@@ -174,10 +174,23 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
 
+  /* Added for Alarm Clock. */
   int64_t ticks_wakeup = get_tick_to_wakeup_first();
   if (ticks_wakeup <= ticks)
   {
     thread_wakeup(ticks);
+  }
+
+  /* Added for Advanced Scheduler. */
+  if (thread_mlfqs)
+  {
+    advanced_increment_recent_cpu (); // per 1 ticks
+    if (timer_ticks () % TIMER_FREQ == 0) // per 1 second
+    {
+      thread_cal_recent_cpu ();
+      advanced_cal_load_avg ();
+    }
+    thread_cal_priority (); // per 4 ticks
   }
 }
 
