@@ -107,6 +107,10 @@ struct thread
 
     /* Project1: Alarm clock */
     int64_t ticks_to_wakeup;
+
+    /* Project1: Advanced Scheduler */
+    int nice;
+    int recent_cpu;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -140,10 +144,16 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+/* Added for Advanced Scheduler. */
+void init_load_avg(void);
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void advanced_cal_load_avg(void);
+void advanced_increment_recent_cpu(void);
+void thread_cal_recent_cpu(void);
+void thread_cal_priority(void);
 
 //Added
 bool cmp_priority_ready_list (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);

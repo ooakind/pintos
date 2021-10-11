@@ -206,17 +206,20 @@ lock_acquire (struct lock *lock)
   //Modified
   struct thread *cur = thread_current();
 
-  if (lock->holder != NULL)
+  if (!thread_mlfqs)
   {
-    cur->waiting_lock = lock;
-    list_insert_ordered(&lock->holder->donator, &cur->donator_elem, cmp_priority_donator, 0);
-    donate();
+    if (lock->holder != NULL)
+    {
+      cur->waiting_lock = lock;
+      list_insert_ordered(&lock->holder->donator, &cur->donator_elem, cmp_priority_donator, 0);
+      donate();
+    }
   }
+  
   sema_down (&lock->semaphore);
 
   lock->holder = cur;
   cur->waiting_lock = NULL;
-  //
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -252,26 +255,28 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   //Modified
-  struct thread *cur = thread_current();
-  if (!list_empty(&cur->donator)) {
-    struct list_elem *e = list_begin(&cur->donator);
-    
-    while (e != list_end (&cur->donator)) 
-    {
-      struct thread *donator_thread = list_entry(e, struct thread, donator_elem);
-      if (lock == donator_thread->waiting_lock)
+  if (!thread_mlfqs)
+  {
+    struct thread *cur = thread_current();
+    if (!list_empty(&cur->donator)) {
+      struct list_elem *e = list_begin(&cur->donator);
+      
+      while (e != list_end (&cur->donator)) 
       {
-        struct list_elem *temp = e;
-        e = list_next(e);
-        list_remove(temp);
-      }
-      else {
-        e = list_next(e);
+        struct thread *donator_thread = list_entry(e, struct thread, donator_elem);
+        if (lock == donator_thread->waiting_lock)
+        {
+          struct list_elem *temp = e;
+          e = list_next(e);
+          list_remove(temp);
+        }
+        else {
+          e = list_next(e);
+        }
       }
     }
+    donation_reset();
   }
-
-  donation_reset();
   sema_up (&lock->semaphore);
 }
 
