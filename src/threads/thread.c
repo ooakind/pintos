@@ -123,6 +123,8 @@ thread_sleep(int64_t ticks)
 void
 thread_wakeup(int64_t ticks)
 {
+  /* Set tick_to_wakeup_first to INT64_MAX to update tick_to_wakeup_first by comparing it with a thread's ticks_to_wakeup. */
+  init_tick_to_wakeup_first();
   struct list_elem *e;
   for (e = list_begin (&sleep_list); e != list_end (&sleep_list);)
   {
@@ -140,7 +142,7 @@ thread_wakeup(int64_t ticks)
 }
 
 /* Initialize tick_to_wakeup_first to INT64_MAX. 
-   At the first time get_tick_to_wakeup_first() is called, tick_to_wakeup_first must be updated.  */
+   At the first time update_tick_to_wakeup_first() is called, tick_to_wakeup_first must be updated.  */
 void
 init_tick_to_wakeup_first(void)
 {
@@ -525,7 +527,7 @@ advanced_cal_load_avg()
 {
   struct thread *cur = thread_current ();
   int num_ready_threads = list_size(&ready_list);
-  /* Add 1 to cound running thread. */
+  /* Add 1 for counting running thread. */
   num_ready_threads = cur != idle_thread ? num_ready_threads + 1 : num_ready_threads;
   int raw_load_avg = div_fp_int(add_fp_int(mul_fp_int(load_avg, 59), num_ready_threads), 60); 
   load_avg = raw_load_avg > 0 ? raw_load_avg : 0;
@@ -675,15 +677,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->org_priority = priority;
   t->waiting_lock = NULL;
   list_init(&t->donator);
-  //
 
   /* Inherit nice and recent_cpu from parent thread. */
-  if (t != idle_thread)
-  {
-    struct thread *cur = running_thread ();
-    t->nice = cur->nice;
-    t->recent_cpu = cur->recent_cpu;
-  }
+  struct thread *cur = running_thread ();
+  t->nice = cur->nice;
+  t->recent_cpu = cur->recent_cpu;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
