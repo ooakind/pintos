@@ -32,7 +32,7 @@ void halt(void)
 
 void validate_user_pointer(void *pointer)
 {
-  if (pointer < PHYS_BASE && pointer > (void *)0x08084000) // >= ?
+  if (!(pointer < PHYS_BASE && pointer > (void *)0x08084000)) // >= ?
   {
     exit(-1);
   }
