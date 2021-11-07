@@ -23,6 +23,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 int write(int fd, const void *buffer, unsigned size)
 {
   if (fd == 1) {
-    return putbuf(buffer, size);
+    putbuf(buffer, size);
+    return size;
   }
+  return -1;
 }
