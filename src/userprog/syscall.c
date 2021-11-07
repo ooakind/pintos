@@ -5,6 +5,7 @@
 #include "threads/thread.h"
 
 static void syscall_handler (struct intr_frame *);
+int write(int fd, const void *buffer, unsigned size);
 
 void
 syscall_init (void) 
@@ -17,4 +18,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   printf ("system call!\n");
   thread_exit ();
+}
+
+int write(int fd, const void *buffer, unsigned size)
+{
+  if (fd == 1) {
+    return putbuf(buffer, size);
+  }
 }
