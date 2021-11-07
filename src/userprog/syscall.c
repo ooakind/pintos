@@ -9,8 +9,6 @@
 
 static void syscall_handler (struct intr_frame *);
 int write(int fd, const void *buffer, unsigned size);
-
-int write(int fd, const void *buffer, unsigned size);
 int get_arg_cnt(int);
 
 void
@@ -44,9 +42,9 @@ void get_syscall_arg(void *sp, int *arg, int arg_cnt)
   int i;
   for (i = 0; i < arg_cnt; i++)
   {
-    sp = (int *)sp + (1 << 31); // Argument size is 4 bytes(32bits)
+    sp = (uint32_t *)sp + 1; // Argument size is 4 bytes(32bits)
     validate_user_pointer(sp); 
-    arg[i] = *(int *)sp;
+    arg[i] = *(uint32_t *)sp;
   }
 }
 
@@ -93,7 +91,7 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
   // printf ("system call!\n");
-  int syscall_num = *(int *)(f->esp);
+  int syscall_num = *(uint32_t *)(f->esp);
   int args[3];
   get_syscall_arg(f->esp, args, get_arg_cnt(syscall_num));
 
@@ -106,31 +104,43 @@ syscall_handler (struct intr_frame *f)
       exit(args[0]);
       break;
     case SYS_EXEC:
-      //f->eax = exec(args[0]);
+      /**
+       * validate_user_pointer((void *)args[0]);
+       * f->eax = exec((const char *)args[0]);
+      */
       break;
     case SYS_WAIT:
-      // f->eax = wait(args[0]);
+      // f->eax = wait((pid_t)args[0]);
       break;
     case SYS_CREATE:
-      //f->eax = create(args[0], args[1]);
+    /**
+     * validate_user_pointer((void *)args[0]);
+     * f->eax = create((const char *)args[0], (unsigned)args[1]);
+     */
       break;
     case SYS_REMOVE:
-      //f->eax = remove(args[0]);
+    /**
+     * validate_user_pointer((void *)args[0]); 
+     * f->eax = remove((const char *)args[0]);
+     */
       break;
     case SYS_OPEN:
-      //f->eax = open(args[0]);
+      /**
+       * validate_user_pointer((void *)args[0]); 
+       * f->eax = open((const char *)args[0]);
+       */
       break;
     case SYS_FILESIZE:
       //f->eax = filesize(args[0]);
       break;
     case SYS_READ:
-      //f->eax = read(args[0], args[1], args[2]);
+      //f->eax = read(args[0], (void *)args[1], (unsigned)args[2]);
       break;
     case SYS_WRITE:
-      //f->eax = write(args[0], args[1], args[2]);
+      f->eax = write(args[0], (const void *)args[1], (unsigned)args[2]);
       break;
     case SYS_SEEK:
-      //seek(args[0], args[1]);
+      //seek(args[0], (unsigned)args[1]);
       break;
     case SYS_TELL:
       //f->eax = tell(args[0]);
