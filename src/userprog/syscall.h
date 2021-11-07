@@ -2,5 +2,9 @@
 #define USERPROG_SYSCALL_H
 
 void syscall_init (void);
+void exit(int status);
+void halt(void);
+void validate_user_pointer(void *pointer);
+void get_syscall_arg(void *sp, int *arg, int arg_cnt);
 
 #endif /* userprog/syscall.h */
