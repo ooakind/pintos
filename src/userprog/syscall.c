@@ -106,34 +106,34 @@ syscall_handler (struct intr_frame *f)
       exit(args[0]);
       break;
     case SYS_EXEC:
-      //exec(args[0]);
+      //f->eax = exec(args[0]);
       break;
     case SYS_WAIT:
-      // wait(args[0]);
+      // f->eax = wait(args[0]);
       break;
     case SYS_CREATE:
-      //create(args[0], args[1]);
+      //f->eax = create(args[0], args[1]);
       break;
     case SYS_REMOVE:
-      //remove(args[0]);
+      //f->eax = remove(args[0]);
       break;
     case SYS_OPEN:
-      //open(args[0]);
+      //f->eax = open(args[0]);
       break;
     case SYS_FILESIZE:
-      //filesize(args[0]);
+      //f->eax = filesize(args[0]);
       break;
     case SYS_READ:
-      //read(args[0], args[1], args[2]);
+      //f->eax = read(args[0], args[1], args[2]);
       break;
     case SYS_WRITE:
-      //write(args[0], args[1], args[2]);
+      //f->eax = write(args[0], args[1], args[2]);
       break;
     case SYS_SEEK:
       //seek(args[0], args[1]);
       break;
     case SYS_TELL:
-      //tell(args[0]);
+      //f->eax = tell(args[0]);
       break;
     case SYS_CLOSE:
       //close(args[0]);
