@@ -24,6 +24,8 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 int tokenizer(char **argv, int max_cnt, char *str);
 void push_argument(char **argv, int argc, void **esp);
+struct thread *get_child(tid_t tid);
+void remove_child(struct thread *child);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -60,6 +62,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  struct thread *t = thread_current();
 
   int argc;
   char *argv[MAX_ARG_CNT];
@@ -73,7 +76,16 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (argv[0], &if_.eip, &if_.esp);
 
-  if (success) push_argument(argv, argc, &if_.esp);
+  if (success) {
+    push_argument(argv, argc, &if_.esp);
+    t->load_status = 1;
+  }
+  else {
+    t->load_status = -1;
+  }
+
+  sema_up(&t->exec_sema);
+
   hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
   /* If load failed, quit. */
@@ -101,10 +113,23 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while (1) {}
-  return -1;
+  struct thread *child_thread = get_child(child_tid);
+  int exit_status;
+  
+  // how to check whether child process has been killed by kernel?
+  if (child_thread == NULL) return -1;
+  if (child_thread->wait_status) return -1;
+
+  if (!child_thread->is_terminated) {
+    sema_down(&child_thread->wait_sema);
+  }
+
+  exit_status = child_thread->exit_status;
+  remove_child(child_thread);
+
+  return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -113,6 +138,9 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  cur->is_terminated = true;
+  sema_up(&cur->wait_sema);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -543,4 +571,24 @@ void push_argument(char **argv, int argc, void **esp)
   *(uint32_t *)*esp = 0;
 
   return;
+}
+
+struct thread *get_child(tid_t pid)
+{
+  struct thread *t = thread_current();
+  struct list_elem *e;
+  
+  for (e = list_begin (&t->children); e != list_end (&t->children);
+       e = list_next (e))
+  {
+    struct thread *child = list_entry(e, struct thread, child_elem);
+    if (child->tid == pid) return child;
+  }
+  return NULL;
+}
+
+void remove_child(struct thread *child)
+{
+  list_remove(&child->child_elem);
+  palloc_free_page(child);
 }
