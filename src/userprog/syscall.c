@@ -32,7 +32,7 @@ void exit(int status)
 {
   thread_current()->exit_status = status;
   int i;
-  for (i = 2; i < 128; i++)
+  for (i = 2; i < FD_TABLE_SIZE; i++)
   {
     struct file * file = process_fd_file_ptr(i); 
     if(file != NULL) 
@@ -65,7 +65,7 @@ int wait (pid_t pid)
 
 void validate_user_pointer(void *pointer)
 {
-  if (pointer == NULL && !(pointer < PHYS_BASE && pointer > (void *)0x08084000)) // >= ?
+  if (pointer == NULL || !(pointer < PHYS_BASE && pointer > (void *)0x8048000)) // >= ?
   {
     exit(-1);
   }
@@ -73,7 +73,7 @@ void validate_user_pointer(void *pointer)
 
 void validate_fd(int fd)
 {
-  if (!(fd >= 0 && fd <= 127))
+  if (!(fd >= 0 && fd < FD_TABLE_SIZE))
   {
     exit(-1);
   }
@@ -154,15 +154,15 @@ syscall_handler (struct intr_frame *f)
       f->eax = wait((pid_t)args[0]);
       break;
     case SYS_CREATE:
-      validate_user_pointer((void *)args[0]);
+      // validate_user_pointer((void *)args[0]);
       f->eax = create((const char *)args[0], (unsigned)args[1]);
       break;
     case SYS_REMOVE:
-      validate_user_pointer((void *)args[0]); 
+      // validate_user_pointer((void *)args[0]); 
       f->eax = remove((const char *)args[0]);
       break;
     case SYS_OPEN:
-      validate_user_pointer((void *)args[0]); 
+      // validate_user_pointer((void *)args[0]); 
       f->eax = open((const char *)args[0]);
       break;
     case SYS_FILESIZE:
@@ -199,7 +199,8 @@ int write(int fd, const void *buffer, unsigned size)
   }else if (fd >= 2)
   {
     struct file * file = process_fd_file_ptr(fd);
-    validate_user_pointer((void *)file);
+    // validate_user_pointer((void *)file);
+    if(file == NULL) exit(-1);
 
     lock_acquire(&file_system_lock);
     written_size = file_write(file, buffer, size);
@@ -224,7 +225,8 @@ int read (int fd, void *buffer, unsigned size)
   }else if(fd >= 2)
   {
     struct file * file = process_fd_file_ptr(fd);
-    validate_user_pointer((void *)file);
+    // validate_user_pointer((void *)file);
+    if(file == NULL) exit(-1);
 
     lock_acquire(&file_system_lock);
     read_size = file_read(file, buffer, size);
@@ -235,19 +237,22 @@ int read (int fd, void *buffer, unsigned size)
 
 bool create(const char *file, unsigned initial_size)
 {
-  validate_user_pointer((void *)file);
+  // validate_user_pointer((void *)file);
+  if (file == NULL) exit(-1); 
   return filesys_create(file, initial_size);
 }
 
 bool remove (const char *file)
 {
-  validate_user_pointer((void *)file);
+  // validate_user_pointer((void *)file);
+  if (file == NULL) exit(-1);
   return filesys_remove(file);
 }
 
 int open (const char *file)
 {
-  validate_user_pointer((void *)file);
+  // validate_user_pointer((void *)file);
+  if (file == NULL) exit(-1);
   int fd = -1;
   
   lock_acquire(&file_system_lock); 
@@ -297,7 +302,8 @@ void close (int fd)
 {
   struct thread *t = thread_current ();
   validate_fd(fd);
-  validate_user_pointer((void *)t->fd_table[fd]);
+  // validate_user_pointer((void *)t->fd_table[fd]);
+  if (t->fd_table[fd] == NULL) exit(-1);
 
   lock_acquire(&file_system_lock); 
   file_close(t->fd_table[fd]);

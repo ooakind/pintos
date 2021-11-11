@@ -25,6 +25,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define FD_TABLE_SIZE 128
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -106,7 +107,7 @@ struct thread
     int exit_status;
     bool wait_status;                     /* true : This thread is already waited by parent / false : Not being waited. */
     bool is_terminated;
-    struct file *fd_table[128];
+    struct file *fd_table[FD_TABLE_SIZE];
 #endif
 
     /* Owned by thread.c. */

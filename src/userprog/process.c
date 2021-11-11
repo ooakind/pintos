@@ -200,7 +200,7 @@ int process_fd_open(struct file *file)
 {
   struct thread *t = thread_current ();
   int i;
-  for (i = 2; i < 128; i++)
+  for (i = 2; i < FD_TABLE_SIZE; i++)
   {
     if (t->fd_table[i] == NULL)
     {
