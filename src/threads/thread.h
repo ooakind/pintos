@@ -96,6 +96,16 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread *parent;
+    struct list children;
+    struct list_elem child_elem;
+    struct semaphore exec_sema;
+    struct semaphore wait_sema;
+    int load_status;                      /* 0 : Not loaded yet. / 1 : Load succeeded. / -1 : Load failed. */
+    int exit_status;
+    bool wait_status;                     /* true : This thread is already waited by parent / false : Not being waited. */
+    bool is_terminated;
+
 #endif
 
     /* Owned by thread.c. */
