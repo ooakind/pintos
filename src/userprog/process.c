@@ -86,7 +86,7 @@ start_process (void *file_name_)
 
   sema_up(&t->exec_sema);
 
-  hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
+  //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);

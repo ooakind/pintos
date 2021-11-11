@@ -198,6 +198,17 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+#ifdef USERPROG
+  t->parent = thread_current();
+  sema_init(&t->exec_sema, 0);
+  sema_init(&t->wait_sema, 0);
+  t->load_status = 0;
+  t->exit_status = 0;
+  t->wait_status = false;
+  t->is_terminated = false;
+  list_push_back(&t->parent->children, &t->child_elem);
+#endif
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -465,15 +476,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   #ifdef USERPROG
-  t->parent = thread_current();
   list_init(&t->children);
-  sema_init(&t->exec_sema, 0);
-  sema_init(&t->wait_sema, 0);
-  t->load_status = 0;
-  t->exit_status = 0;
-  t->wait_status = false;
-  t->is_terminated = false;
-  list_push_back(&t->parent->children, &t->child_elem);
   #endif
 
   old_level = intr_disable ();
