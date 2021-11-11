@@ -477,6 +477,11 @@ init_thread (struct thread *t, const char *name, int priority)
 
   #ifdef USERPROG
   list_init(&t->children);
+  int i;
+  for (i = 0; i < 128; i++)
+  {
+    t->fd_table[i] = NULL;
+  }
   #endif
 
   old_level = intr_disable ();

@@ -18,6 +18,11 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+/* Added for Project 2 */
+#include "filesys/off_t.h"
+#include "userprog/syscall.h"
+#include "threads/synch.h"
+
 #define MAX_ARG_CNT 32
 
 static thread_func start_process NO_RETURN;
@@ -26,6 +31,14 @@ int tokenizer(char **argv, int max_cnt, char *str);
 void push_argument(char **argv, int argc, void **esp);
 struct thread *get_child(tid_t tid);
 void remove_child(struct thread *child);
+
+/* Project 2: Definition of struct file. Copied from file.c */
+struct file 
+  {
+    struct inode *inode;        /* File's inode. */
+    off_t pos;                  /* Current position. */
+    bool deny_write;            /* Has file_deny_write() been called? */
+  };
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -175,6 +188,35 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
+
+/* Added for file descriptor in Project 2. */
+int process_fd_open(struct file *file)
+{
+  struct thread *t = thread_current ();
+  int i;
+  for (i = 2; i < 128; i++)
+  {
+    if (t->fd_table[i] == NULL)
+    {
+      t->fd_table[i] = file;
+      break;
+    }
+  }
+  return i;
+}
+
+struct file * process_fd_file_ptr(int fd)
+{
+  struct thread *t = thread_current ();
+  return t->fd_table[fd];
+}
+
+void process_fd_close(int fd)// Necessary?
+{
+  struct thread *t = thread_current ();
+  file_close(t->fd_table[fd]);
+  t->fd_table[fd] = NULL;
+}
 
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
@@ -266,12 +308,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&file_system_lock); // Added in Project 2
   file = filesys_open (file_name);
   if (file == NULL) 
     {
+      lock_release(&file_system_lock); // Added in Project 2
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  file_deny_write(file); // Added in Project 2
+  lock_release(&file_system_lock); // Added in Project 2
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
