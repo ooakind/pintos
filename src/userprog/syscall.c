@@ -170,7 +170,6 @@ syscall_handler (struct intr_frame *f)
     default:
       break;
   }
-  thread_exit ();
 }
 
 int write(int fd, const void *buffer, unsigned size)
