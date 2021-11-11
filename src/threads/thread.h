@@ -106,7 +106,7 @@ struct thread
     int exit_status;
     bool wait_status;                     /* true : This thread is already waited by parent / false : Not being waited. */
     bool is_terminated;
-
+    struct file *fd_table[128];
 #endif
 
     /* Owned by thread.c. */

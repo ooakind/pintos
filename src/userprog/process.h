@@ -10,4 +10,9 @@ void process_activate (void);
 struct thread *get_child(tid_t pid);
 void remove_child(struct thread *child);
 
+/* Project 2 */
+int process_fd_open(struct file *file);
+struct file * process_fd_file_ptr(int fd);
+void process_fd_close(int fd);
+
 #endif /* userprog/process.h */
