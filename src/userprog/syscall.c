@@ -19,6 +19,11 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+void halt(void)
+{
+  shutdown_power_off ();
+}
+
 void exit(int status)
 {
   thread_current()->exit_status = status;
@@ -39,9 +44,9 @@ pid_t exec (const char *cmd_line)
   else return -1;   //load_status == 0(which means process is not loaded yet. should not happen)
 }
 
-void halt(void)
+int wait (pid_t pid)
 {
-  shutdown_power_off ();
+  return process_wait(pid);
 }
 
 void validate_user_pointer(void *pointer)
@@ -120,13 +125,11 @@ syscall_handler (struct intr_frame *f)
       exit(args[0]);
       break;
     case SYS_EXEC:
-      /**
-       * validate_user_pointer((void *)args[0]);
-       * f->eax = exec((const char *)args[0]);
-      */
+       validate_user_pointer((void *)args[0]);
+       f->eax = exec((const char *)args[0]);
       break;
     case SYS_WAIT:
-      // f->eax = wait((pid_t)args[0]);
+      f->eax = wait((pid_t)args[0]);
       break;
     case SYS_CREATE:
     /**
