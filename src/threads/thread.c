@@ -198,6 +198,17 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+#ifdef USERPROG
+  t->parent = thread_current();
+  sema_init(&t->exec_sema, 0);
+  sema_init(&t->wait_sema, 0);
+  t->load_status = 0;
+  t->exit_status = 0;
+  t->wait_status = false;
+  t->is_terminated = false;
+  list_push_back(&t->parent->children, &t->child_elem);
+#endif
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -464,6 +475,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  #ifdef USERPROG
+  list_init(&t->children);
+  #endif
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -538,7 +553,7 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
-      palloc_free_page (prev);
+      //palloc_free_page (prev);
     }
 }
 

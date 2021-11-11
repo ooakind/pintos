@@ -6,6 +6,8 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include <string.h>
+#include "userprog/process.h"
+#include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
 int write(int fd, const void *buffer, unsigned size);
@@ -17,15 +19,34 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+void halt(void)
+{
+  shutdown_power_off ();
+}
+
 void exit(int status)
 {
+  thread_current()->exit_status = status;
   printf("%s: exit(%d)\n", thread_name(), status);
   thread_exit();
 }
 
-void halt(void)
+pid_t exec (const char *cmd_line)
 {
-  shutdown_power_off ();
+  pid_t pid = process_execute(cmd_line);
+  struct thread *new_process = get_child(pid);
+  if (new_process == NULL) return -1;
+
+  sema_down(&new_process->exec_sema);
+
+  if (new_process->load_status == 1) return pid;
+  else if (new_process->load_status == -1) return -1;
+  else return -1;   //load_status == 0(which means process is not loaded yet. should not happen)
+}
+
+int wait (pid_t pid)
+{
+  return process_wait(pid);
 }
 
 void validate_user_pointer(void *pointer)
@@ -104,13 +125,11 @@ syscall_handler (struct intr_frame *f)
       exit(args[0]);
       break;
     case SYS_EXEC:
-      /**
-       * validate_user_pointer((void *)args[0]);
-       * f->eax = exec((const char *)args[0]);
-      */
+       validate_user_pointer((void *)args[0]);
+       f->eax = exec((const char *)args[0]);
       break;
     case SYS_WAIT:
-      // f->eax = wait((pid_t)args[0]);
+      f->eax = wait((pid_t)args[0]);
       break;
     case SYS_CREATE:
     /**
@@ -151,7 +170,6 @@ syscall_handler (struct intr_frame *f)
     default:
       break;
   }
-  thread_exit ();
 }
 
 int write(int fd, const void *buffer, unsigned size)
