@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
 
 /* Added for Project 2 */
 #include "filesys/off_t.h"
@@ -107,6 +108,8 @@ start_process (void *file_name_)
 
   //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
 
+  spt_init(&(t->spt));
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -160,6 +163,8 @@ process_exit (void)
 
   cur->is_terminated = true;
   sema_up(&cur->wait_sema);
+
+  spt_destroy(&(cur->spt));
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
