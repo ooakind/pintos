@@ -3,6 +3,8 @@
 
 #include <list.h>
 #include <hash.h>
+#include <debug.h>
+#include "filesys/file.h"
 
 enum page_type
 {
@@ -19,8 +21,8 @@ struct page
     void* addr;
     bool write;
     bool loaded;
-    struct frame* frame;
-    struct file* file;      //what struct file?
+    //struct frame* frame;
+    struct file* file;
     size_t offset;
     size_t read_bytes;
     size_t zero_bytes;
@@ -31,11 +33,12 @@ struct page
 
 void spt_init(struct hash* spt);
 void spt_destroy(struct hash* spt);
-unsigned hash_hash_func(const struct hash_elem* element, void* aux UNUSED);
-bool hash_less_func(const struct hash_elem* a, const struct hash_elem* b, void* aux UNUSED);
+unsigned page_hash_func(const struct hash_elem* element, void* aux UNUSED);
+bool page_less_func(const struct hash_elem* a, const struct hash_elem* b, void* aux UNUSED);
 void hash_destroy_func(struct hash_elem *element, void* aux UNUSED);
 struct page* spt_page_find(struct hash* spt, void* addr);
 bool spt_page_insert(struct hash* spt, struct page* p);
 bool spt_page_delete(struct hash* spt, struct page* p);
+bool load_file(struct page* page, void* frame_addr);
 
 #endif /* vm/page.h */

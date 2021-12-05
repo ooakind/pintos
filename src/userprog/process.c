@@ -24,6 +24,9 @@
 #include "userprog/syscall.h"
 #include "threads/synch.h"
 
+/* Added for Project 3 */
+#include "threads/malloc.h"
+
 #define MAX_ARG_CNT 32
 
 static thread_func start_process NO_RETURN;
@@ -488,7 +491,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -498,25 +500,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /*
-      //Get a page of memory.
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
+      
 
-      //Load this page.
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      //Add the page to the process's address space.
-      if (!install_page (upage, kpage, writable)) 
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
       */
       struct page* p = (struct page*) malloc(sizeof(struct page));
       if (p == NULL)
@@ -526,7 +511,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       p->addr = upage;
       p->write = writable;
       p->loaded = false;
-      p->frame = NULL;
+      //p->frame = NULL;
       p->file = file;
       p->offset = ofs;
       p->read_bytes = page_read_bytes;
@@ -572,7 +557,7 @@ setup_stack (void **esp)
   p->addr = ((uint8_t *) PHYS_BASE) - PGSIZE;
   p->write = true;
   p->loaded = false;
-  p->frame = NULL;
+  //p->frame = NULL;
   p->file = NULL;
   p->offset = 0;
   p->read_bytes = 0;
@@ -689,4 +674,42 @@ void remove_child(struct thread *child)
 {
   list_remove(&child->child_elem);
   palloc_free_page(child);
+}
+
+bool page_fault_handler(struct page* page)
+{
+  if (page == NULL)
+    return false;
+
+  //Get a page of memory.
+  bool result;
+  uint8_t *frame_addr = palloc_get_page (PAL_USER);
+  if (frame_addr == NULL)
+    return false;
+
+  if (page->type == PAGE_EXE)
+  {
+    result = load_file(page, frame_addr);
+  }
+  else
+  {
+    result = false;
+  }
+
+  if (!result)
+  {
+    palloc_free_page(frame_addr);
+    return false;
+  }
+
+  result = install_page (page->addr, frame_addr, page->write);
+  if (!result)
+  {
+    palloc_free_page(frame_addr);
+    return false;
+  }
+
+  page->loaded = true;
+
+  return true;
 }

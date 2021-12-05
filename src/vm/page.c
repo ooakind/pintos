@@ -1,13 +1,16 @@
 #include "vm/page.h"
+#include <debug.h>
+#include <string.h>
 #include "threads/vaddr.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
+#include "filesys/file.h"
 
 void spt_init(struct hash* spt)
 {
-    return hash_init(spt, hash_hash_func, hash_less_func, NULL);
+    hash_init(spt, page_hash_func, page_less_func, NULL);
 }
 
 void spt_destroy(struct hash* spt)
@@ -16,13 +19,13 @@ void spt_destroy(struct hash* spt)
     return;
 }
 
-unsigned hash_hash_func(const struct hash_elem* element, void* aux UNUSED)
+unsigned page_hash_func(const struct hash_elem* element, void* aux UNUSED)
 {
     struct page* p = hash_entry(element, struct page, hash_elem);
     return hash_int((int)(p->addr));
 }
 
-bool hash_less_func(const struct hash_elem* a, const struct hash_elem* b, void* aux)
+bool page_less_func(const struct hash_elem* a, const struct hash_elem* b, void* aux)
 {
     struct page* pa = hash_entry(a, struct page, hash_elem);
     struct page* pb = hash_entry(b, struct page, hash_elem);
@@ -34,7 +37,8 @@ void hash_destroy_func(struct hash_elem *element, void* aux UNUSED)
     struct page* p = hash_entry(element, struct page, hash_elem);
     struct thread* t = thread_current();
     if (p->loaded) {
-        palloc_free_page(p->frame->p_addr);     //Will not work before frame is implemented.
+        //palloc_free_page(p->frame->p_addr);     //Will not work before frame is implemented.
+        palloc_free_page(pagedir_get_page(t->pagedir, p->addr));
         pagedir_clear_page(t->pagedir, p->addr);
     }
     free(p);
@@ -63,4 +67,16 @@ bool spt_page_delete(struct hash* spt, struct page* p)
     struct hash_elem* e = hash_delete(spt, &(p->hash_elem));
     if (e != NULL) return true;
     else return false;
+}
+
+bool load_file(struct page* page, void* frame_addr)
+{
+    file_seek (page->file, page->offset);
+    //Load this page.
+    if (file_read (page->file, frame_addr, page->read_bytes) != (int) page->read_bytes)
+    {
+        return false; 
+    }
+    memset (frame_addr + page->read_bytes, 0, page->zero_bytes);
+    return true;
 }
