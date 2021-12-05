@@ -12,6 +12,8 @@
 #include "userprog/process.h"
 #include "filesys/file.h"
 #include <devices/input.h>
+/* Added for Project 3 */
+#include "vm/page.h"
 
 static void syscall_handler (struct intr_frame *);
 int get_arg_cnt(int);
@@ -69,12 +71,13 @@ int wait (pid_t pid)
   return process_wait(pid);
 }
 
-void validate_user_pointer(void *pointer)
+struct page* validate_user_pointer(void *pointer)
 {
   if (pointer == NULL || !(pointer < PHYS_BASE && pointer > (void *)0x8048000)) // >= ?
   {
     exit(-1);
   }
+  return spt_page_find(&thread_current()->spt, pg_round_down(pointer));
 }
 
 void validate_fd(int fd)
@@ -83,6 +86,29 @@ void validate_fd(int fd)
   {
     exit(-1);
   }
+}
+
+void validate_buffer(void* buffer, unsigned size, bool writable)
+{
+  void* page_begin_addr = pg_round_down(buffer);
+  void* page_end_addr = pg_round_up((char *)buffer + size);
+  struct page* p;
+  
+  while (page_begin_addr < page_end_addr)
+  {
+    p = validate_user_pointer(page_begin_addr);
+    if (p == NULL)
+      exit(-1);
+    if (writable == true && p->write == false)
+      exit(-1);
+
+    page_begin_addr = (void *) ((uintptr_t) page_begin_addr + PGSIZE);
+  }
+}
+
+void validate_string(void* str, bool writable)
+{
+  validate_buffer(str, strlen((char *)str), writable);
 }
 
 void get_syscall_arg(void *sp, int *arg, int arg_cnt)
@@ -152,7 +178,7 @@ syscall_handler (struct intr_frame *f)
       exit(args[0]);
       break;
     case SYS_EXEC:
-       validate_user_pointer((void *)args[0]);
+       validate_string((void *)args[0], false);
        f->eax = exec((const char *)args[0]);
       break;
     case SYS_WAIT:
@@ -193,6 +219,7 @@ syscall_handler (struct intr_frame *f)
 int write(int fd, const void *buffer, unsigned size)
 {
   validate_fd(fd);
+  validate_buffer(buffer, size, false);
   int written_size = -1;
   struct thread *t = thread_current ();
 
@@ -200,10 +227,10 @@ int write(int fd, const void *buffer, unsigned size)
   {
     putbuf(buffer, size);
     written_size = size;
-  }else if (fd >= 2)
+  }
+  else if (fd >= 2)
   {
     struct file * file = process_fd_file_ptr(fd);
-    validate_user_pointer(buffer);
     if(file == NULL) exit(-1);
 
     lock_acquire(&file_system_lock);
@@ -217,6 +244,7 @@ int write(int fd, const void *buffer, unsigned size)
 int read (int fd, void *buffer, unsigned size)
 {
   validate_fd(fd);
+  validate_buffer(buffer, size, true);
   int read_size = -1;
   if (fd == 0)
   {
@@ -230,7 +258,6 @@ int read (int fd, void *buffer, unsigned size)
   }else if(fd >= 2)
   {
     struct file * file = process_fd_file_ptr(fd);
-    validate_user_pointer(buffer);
     if(file == NULL) exit(-1);
 
     lock_acquire(&file_system_lock);

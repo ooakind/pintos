@@ -497,12 +497,13 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
+      /*
+      //Get a page of memory.
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
 
-      /* Load this page. */
+      //Load this page.
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
@@ -510,16 +511,36 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
+      //Add the page to the process's address space.
       if (!install_page (upage, kpage, writable)) 
         {
           palloc_free_page (kpage);
           return false; 
         }
+      */
+      struct page* p = (struct page*) malloc(sizeof(struct page));
+      if (p == NULL)
+        return false;
+      
+      p->type = PAGE_EXE;
+      p->addr = upage;
+      p->write = writable;
+      p->loaded = false;
+      p->frame = NULL;
+      p->file = file;
+      p->offset = ofs;
+      p->read_bytes = page_read_bytes;
+      p->zero_bytes = page_zero_bytes;
+      p->swap_elem = 0;
+
+      struct thread* t = thread_current();
+      if (!spt_page_insert(&t->spt, p))
+        return false;
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      ofs += page_read_bytes;
       upage += PGSIZE;
     }
   return true;
@@ -542,6 +563,26 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+  
+  struct page* p = (struct page*) malloc(sizeof(struct page));
+  if (p == NULL)
+    return false;
+  
+  p->type = PAGE_STACK;
+  p->addr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  p->write = true;
+  p->loaded = false;
+  p->frame = NULL;
+  p->file = NULL;
+  p->offset = 0;
+  p->read_bytes = 0;
+  p->zero_bytes = 0;
+  p->swap_elem = 0;
+
+  struct thread* t = thread_current();
+  if (!spt_page_insert(&t->spt, p))
+    return false;
+
   return success;
 }
 
