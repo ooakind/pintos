@@ -4,7 +4,6 @@
 #include <list.h>
 #include <hash.h>
 #include <debug.h>
-#include "filesys/file.h"
 
 enum page_type
 {

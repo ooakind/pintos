@@ -73,7 +73,9 @@ bool load_file(struct page* page, void* frame_addr)
 {
     file_seek (page->file, page->offset);
     //Load this page.
-    if (file_read (page->file, frame_addr, page->read_bytes) != (int) page->read_bytes)
+    //if (file_read (page->file, frame_addr, page->read_bytes) != (int) page->read_bytes)
+    int read_bytes = file_read (page->file, frame_addr, page->read_bytes);// file_read_at(page->file, frame_addr, page->read_bytes, page->offset);
+    if (read_bytes != (int) page->read_bytes)
     {
         return false; 
     }

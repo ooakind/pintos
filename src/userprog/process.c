@@ -17,7 +17,6 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "vm/page.h"
 
 /* Added for Project 2 */
 #include "filesys/off_t.h"
@@ -26,6 +25,7 @@
 
 /* Added for Project 3 */
 #include "threads/malloc.h"
+#include "vm/page.h"
 
 #define MAX_ARG_CNT 32
 
@@ -90,6 +90,7 @@ start_process (void *file_name_)
   int argc;
   char *argv[MAX_ARG_CNT];
 
+  spt_init(&(t->spt));
   argc = tokenizer(argv, MAX_ARG_CNT, file_name);
 
   /* Initialize interrupt frame and load executable. */
@@ -97,6 +98,7 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
   success = load (argv[0], &if_.eip, &if_.esp);
 
   if (success) {
@@ -110,8 +112,6 @@ start_process (void *file_name_)
   sema_up(&t->exec_sema);
 
   //hex_dump(if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
-
-  spt_init(&(t->spt));
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -333,6 +333,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_deny_write(file); // Added in Project 2
   lock_release(&file_system_lock); // Added in Project 2
 
+
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -359,6 +360,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
         goto done;
       file_ofs += sizeof phdr;
+      
       switch (phdr.p_type) 
         {
         case PT_NULL:
@@ -395,6 +397,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
+              
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
@@ -416,7 +419,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   return success;
 }
 
@@ -490,7 +493,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
+  struct page* p;
+  struct thread* t = thread_current();
 
+  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -499,11 +505,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /*
-      
-
-      */
-      struct page* p = (struct page*) malloc(sizeof(struct page));
+      p = malloc(sizeof(struct page));
       if (p == NULL)
         return false;
       
@@ -518,9 +520,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       p->zero_bytes = page_zero_bytes;
       p->swap_elem = 0;
 
-      struct thread* t = thread_current();
-      if (!spt_page_insert(&t->spt, p))
+      if (!spt_page_insert(&(t->spt), p))
         return false;
+      
 
       /* Advance. */
       read_bytes -= page_read_bytes;

@@ -95,7 +95,6 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct hash spt;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -111,6 +110,7 @@ struct thread
     bool is_terminated;
     struct file *fd_table[FD_TABLE_SIZE];
 #endif
+    struct hash spt;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
