@@ -5,6 +5,7 @@
 #include <hash.h>
 #include <debug.h>
 
+typedef int mapid_t;
 enum page_type
 {
     PAGE_EXE,
@@ -28,6 +29,14 @@ struct page
     struct hash_elem hash_elem;
     struct list_elem fmm_elem;
     size_t swap_elem;
+};
+
+struct fmm_file
+{
+    mapid_t mapid;
+    struct file *file;
+    struct list_elem elem;
+    struct list p_list;
 };
 
 void spt_init(struct hash* spt);

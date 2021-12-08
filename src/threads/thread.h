@@ -111,7 +111,8 @@ struct thread
     struct file *fd_table[FD_TABLE_SIZE];
 #endif
     struct hash spt;
-
+    struct list fmm_list;
+    int fmm_last_mapid;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

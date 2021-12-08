@@ -26,7 +26,7 @@
 /* Added for Project 3 */
 #include "threads/malloc.h"
 #include "vm/page.h"
-
+ 
 #define MAX_ARG_CNT 32
 
 static thread_func start_process NO_RETURN;
@@ -164,6 +164,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  munmap(0);
   cur->is_terminated = true;
   sema_up(&cur->wait_sema);
 
@@ -693,7 +694,11 @@ bool page_fault_handler(struct page* page)
   {
     result = load_file(page, frame_addr);
   }
-  else
+  else if (page->type == PAGE_FILE)
+  {
+    result = load_file(page, frame_addr);
+  }
+  else 
   {
     result = false;
   }

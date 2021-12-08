@@ -5,7 +5,8 @@ typedef int pid_t;
 
 #include <stdbool.h>
 #include "threads/thread.h"
-#include "threads/synch.h" 
+#include "threads/synch.h"
+#include "vm/page.h"
 
 struct lock file_system_lock;
 
@@ -28,5 +29,9 @@ int filesize (int fd);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+void munmap (mapid_t mapping);
+void munmap_all_pages (struct fmm_file *fmm_file);
+struct fmm_file* find_fmm_by_mapid (mapid_t mapping);
+mapid_t mmap(int fd, void *addr);
 
 #endif /* userprog/syscall.h */

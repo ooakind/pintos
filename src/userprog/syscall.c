@@ -14,6 +14,8 @@
 #include <devices/input.h>
 /* Added for Project 3 */
 #include "vm/page.h"
+#include "userprog/pagedir.h"
+#include "threads/malloc.h"
 
 static void syscall_handler (struct intr_frame *);
 int get_arg_cnt(int);
@@ -153,6 +155,10 @@ int get_arg_cnt(int syscall_num)
       return 1;
     case SYS_CLOSE:
       return 1;
+    case SYS_MMAP:
+      return 2;
+    case SYS_MUNMAP:
+      return 1;
     default:
       printf("Syscall number error: %d\n", syscall_num);
       return 0;
@@ -210,6 +216,12 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CLOSE:
       close(args[0]);
+      break;
+    case SYS_MMAP:
+      f->eax = mmap(args[0], (void *)args[1]);
+      break;
+    case SYS_MUNMAP:
+      munmap(args[0]);
       break;
     default:
       break;
@@ -329,4 +341,107 @@ void close (int fd)
   file_close(t->fd_table[fd]);
   t->fd_table[fd] = NULL;
 }
-  
+
+mapid_t mmap(int fd, void *addr)
+{
+  struct thread *t = thread_current ();
+
+  if (fd == 0 || fd == 1) exit(-1); // validate fd
+  if (addr == NULL || !is_user_vaddr(addr) || pg_round_down(addr) != addr) return -1; // check addr is user address
+  if (spt_page_find(&t->spt, addr)) return -1; //check if a page with addr already exists
+
+  // lock_acquire(&file_system_lock);
+
+  struct file *file_copy = file_reopen(process_fd_file_ptr(fd));
+  if (file_copy == NULL) return -1;
+
+  struct fmm_file *fmm_file = (struct fmm_file*)malloc(sizeof(struct fmm_file));
+  fmm_file->mapid = t->fmm_last_mapid++; 
+  fmm_file->file = file_copy;
+  list_push_back(&t->fmm_list, &fmm_file->elem);
+  list_init(&fmm_file->p_list);
+
+  // Create page objects
+  int file_len = file_length(file_copy);
+  size_t offset = 0;
+  for(;file_len > 0; file_len -= PGSIZE)
+  {
+    struct page *p = (struct page*)malloc(sizeof(struct page));
+    p->type = PAGE_FILE;
+    p->addr = addr;
+    p->write = true;
+    p->loaded = false;
+    p->file = file_copy;
+    p->offset = offset;
+    p->read_bytes = PGSIZE > file_len ? PGSIZE : file_len;
+    p->zero_bytes = PGSIZE > file_len ? PGSIZE - file_len : 0;
+    spt_page_insert(&t->spt, p);
+    list_push_back(&fmm_file->p_list, &p->fmm_elem);
+
+    addr = (void*)((uintptr_t)addr + PGSIZE);
+    offset += PGSIZE;
+  }
+  // lock_release(&file_system_lock);
+
+  return fmm_file->mapid;
+}
+
+void munmap(mapid_t mapping)
+{
+  // If mapping is 0, free all page objects in fmm_list.  
+  if (mapping == 0)
+  {
+    struct thread *t = thread_current ();
+    struct list_elem *e;
+    for (e = list_begin (&t->fmm_list); e != list_end (&t->fmm_list); e = list_next (e))
+    {
+      struct fmm_file *f = list_entry (e, struct fmm_file, elem);
+      munmap_all_pages(f);
+    }
+  }
+  else
+  {
+    struct fmm_file *fmm_file = find_fmm_by_mapid(mapping);
+    if (fmm_file == NULL) exit(-1);
+
+    munmap_all_pages(fmm_file);
+  }
+}
+
+void munmap_all_pages(struct fmm_file *fmm_file)
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+ 
+  for (e = list_begin (&fmm_file->p_list); e != list_end (&fmm_file->p_list);)
+  {
+    struct page *p = list_entry (e, struct page, fmm_elem);
+    if (p->loaded && pagedir_is_dirty(t->pagedir, p->addr))
+    {
+      lock_acquire(&file_system_lock);
+      file_write_at(p->file, p->addr, p->read_bytes, p->offset);
+      lock_release(&file_system_lock);
+    }
+    e = list_remove (e);
+    spt_page_delete(&t->spt, p);
+  }
+  list_remove(&fmm_file->elem);
+  file_close(fmm_file->file);
+  free(fmm_file);
+}
+
+struct fmm_file* find_fmm_by_mapid(mapid_t mapping)
+{
+  struct thread *t = thread_current ();
+
+  struct fmm_file *f;
+  struct list_elem *e;
+  for (e = list_begin (&t->fmm_list); e != list_end (&t->fmm_list); e = list_next (e))
+  {
+    f = list_entry (e, struct fmm_file, elem);
+    if (f->mapid == mapping) return f;
+  }
+
+  return NULL;
+}
+

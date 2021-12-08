@@ -483,6 +483,8 @@ init_thread (struct thread *t, const char *name, int priority)
     t->fd_table[i] = NULL;
   }
   #endif
+  list_init(&t->fmm_list);
+  t->fmm_last_mapid = 1;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
