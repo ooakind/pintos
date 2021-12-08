@@ -346,7 +346,7 @@ mapid_t mmap(int fd, void *addr)
 {
   struct thread *t = thread_current ();
 
-  if (fd == 0 || fd == 1) exit(-1); // validate fd
+  if (fd == 0 || fd == 1) return -1; // validate fd
   if (addr == NULL || !is_user_vaddr(addr) || pg_round_down(addr) != addr) return -1; // check addr is user address
   if (spt_page_find(&t->spt, addr)) return -1; //check if a page with addr already exists
 
@@ -354,6 +354,10 @@ mapid_t mmap(int fd, void *addr)
 
   struct file *file_copy = file_reopen(process_fd_file_ptr(fd));
   if (file_copy == NULL) return -1;
+  
+  // Create page objects
+  int file_len = file_length(file_copy);
+  if (file_len == 0) return -1;
 
   struct fmm_file *fmm_file = (struct fmm_file*)malloc(sizeof(struct fmm_file));
   fmm_file->mapid = t->fmm_last_mapid++; 
@@ -361,8 +365,6 @@ mapid_t mmap(int fd, void *addr)
   list_push_back(&t->fmm_list, &fmm_file->elem);
   list_init(&fmm_file->p_list);
 
-  // Create page objects
-  int file_len = file_length(file_copy);
   size_t offset = 0;
   for(;file_len > 0; file_len -= PGSIZE)
   {
@@ -373,8 +375,8 @@ mapid_t mmap(int fd, void *addr)
     p->loaded = false;
     p->file = file_copy;
     p->offset = offset;
-    p->read_bytes = PGSIZE > file_len ? PGSIZE : file_len;
-    p->zero_bytes = PGSIZE > file_len ? PGSIZE - file_len : 0;
+    p->read_bytes = PGSIZE > file_len ? file_len : PGSIZE;
+    p->zero_bytes = PGSIZE - p->read_bytes;
     spt_page_insert(&t->spt, p);
     list_push_back(&fmm_file->p_list, &p->fmm_elem);
 
@@ -393,18 +395,24 @@ void munmap(mapid_t mapping)
   {
     struct thread *t = thread_current ();
     struct list_elem *e;
-    for (e = list_begin (&t->fmm_list); e != list_end (&t->fmm_list); e = list_next (e))
+    for (e = list_begin (&t->fmm_list); e != list_end (&t->fmm_list);)
     {
       struct fmm_file *f = list_entry (e, struct fmm_file, elem);
       munmap_all_pages(f);
+      e = list_remove(e);
+      file_close(f->file);
+      free(f);
     }
   }
   else
   {
     struct fmm_file *fmm_file = find_fmm_by_mapid(mapping);
-    if (fmm_file == NULL) exit(-1);
+    if (fmm_file == NULL) return; //exit(-1);
 
     munmap_all_pages(fmm_file);
+    list_remove(&fmm_file->elem);
+    file_close(fmm_file->file);
+    free(fmm_file);
   }
 }
 
@@ -425,9 +433,6 @@ void munmap_all_pages(struct fmm_file *fmm_file)
     e = list_remove (e);
     spt_page_delete(&t->spt, p);
   }
-  list_remove(&fmm_file->elem);
-  file_close(fmm_file->file);
-  free(fmm_file);
 }
 
 struct fmm_file* find_fmm_by_mapid(mapid_t mapping)

@@ -65,7 +65,16 @@ bool spt_page_insert(struct hash* spt, struct page* p)
 bool spt_page_delete(struct hash* spt, struct page* p)
 {
     struct hash_elem* e = hash_delete(spt, &(p->hash_elem));
-    if (e != NULL) return true;
+    if (e != NULL) {
+        struct thread* t = thread_current();
+        if (p->loaded) {
+            //palloc_free_page(p->frame->p_addr);     //Will not work before frame is implemented.
+            palloc_free_page(pagedir_get_page(t->pagedir, p->addr));
+            pagedir_clear_page(t->pagedir, p->addr);
+        }
+        free(p);
+        return true;
+    }
     else return false;
 }
 
