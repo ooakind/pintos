@@ -10,7 +10,10 @@ void swap_init()
 
 void swap_in(size_t idx, void* p_addr)
 {
-    
+
 }
 
-size_t swap_out(void* p_addr);
+size_t swap_out(void* p_addr)
+{
+    return 0;
+}

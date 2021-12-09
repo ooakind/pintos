@@ -21,6 +21,6 @@ struct frame* ft_find_by_addr(void* p_addr);
 struct list_elem* ft_select_next(void);
 struct frame* allocate_frame(enum palloc_flags flag);
 void free_frame(void* p_addr);
-void evict_frame(enum palloc_flags flag);
+void evict_frame(void);
 
 #endif /* vm/frame.h */
