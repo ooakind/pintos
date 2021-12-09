@@ -26,6 +26,7 @@
 /* Added for Project 3 */
 #include "threads/malloc.h"
 #include "vm/page.h"
+#include "vm/frame.h"
  
 #define MAX_ARG_CNT 32
 
@@ -514,7 +515,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       p->addr = upage;
       p->write = writable;
       p->loaded = false;
-      //p->frame = NULL;
+      p->frame = NULL;
       p->file = file;
       p->offset = ofs;
       p->read_bytes = page_read_bytes;
@@ -539,18 +540,19 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+  struct frame* frame;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else
-        palloc_free_page (kpage);
-    }
+  frame = allocate_frame(PAL_USER | PAL_ZERO);
+  if (frame != NULL) 
+  {
+    success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, frame->p_addr, true);
+    if (success)
+      *esp = PHYS_BASE;
+    else
+      free_frame (frame->p_addr);
+  }
+  else return false;
   
   struct page* p = (struct page*) malloc(sizeof(struct page));
   if (p == NULL)
@@ -560,16 +562,22 @@ setup_stack (void **esp)
   p->addr = ((uint8_t *) PHYS_BASE) - PGSIZE;
   p->write = true;
   p->loaded = false;
-  //p->frame = NULL;
+  p->frame = frame;
   p->file = NULL;
   p->offset = 0;
   p->read_bytes = 0;
   p->zero_bytes = 0;
   p->swap_elem = 0;
 
+  frame->p_entry = p;
+
   struct thread* t = thread_current();
   if (!spt_page_insert(&t->spt, p))
+  {
+    free_frame(frame->p_addr);
+    free(p);
     return false;
+  }
 
   return success;
 }
@@ -686,17 +694,18 @@ bool page_fault_handler(struct page* page)
 
   //Get a page of memory.
   bool result;
-  uint8_t *frame_addr = palloc_get_page (PAL_USER);
-  if (frame_addr == NULL)
+  struct frame* frame = allocate_frame(PAL_USER);
+  if (frame == NULL)
     return false;
+  frame->p_entry = page;
 
   if (page->type == PAGE_EXE)
   {
-    result = load_file(page, frame_addr);
+    result = load_file(page, frame->p_addr);
   }
   else if (page->type == PAGE_FILE)
   {
-    result = load_file(page, frame_addr);
+    result = load_file(page, frame->p_addr);
   }
   else 
   {
@@ -705,18 +714,19 @@ bool page_fault_handler(struct page* page)
 
   if (!result)
   {
-    palloc_free_page(frame_addr);
+    free_frame(frame->p_addr);
     return false;
   }
 
-  result = install_page (page->addr, frame_addr, page->write);
+  result = install_page (page->addr, frame->p_addr, page->write);
   if (!result)
   {
-    palloc_free_page(frame_addr);
+    free_frame(frame->p_addr);
     return false;
   }
 
   page->loaded = true;
+  page->frame = frame;
 
   return true;
 }

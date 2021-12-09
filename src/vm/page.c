@@ -7,6 +7,7 @@
 #include "threads/malloc.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
+#include "vm/frame.h"
 
 void spt_init(struct hash* spt)
 {
@@ -25,7 +26,7 @@ unsigned page_hash_func(const struct hash_elem* element, void* aux UNUSED)
     return hash_int((int)(p->addr));
 }
 
-bool page_less_func(const struct hash_elem* a, const struct hash_elem* b, void* aux)
+bool page_less_func(const struct hash_elem* a, const struct hash_elem* b, void* aux UNUSED)
 {
     struct page* pa = hash_entry(a, struct page, hash_elem);
     struct page* pb = hash_entry(b, struct page, hash_elem);
@@ -37,8 +38,8 @@ void hash_destroy_func(struct hash_elem *element, void* aux UNUSED)
     struct page* p = hash_entry(element, struct page, hash_elem);
     struct thread* t = thread_current();
     if (p->loaded) {
-        //palloc_free_page(p->frame->p_addr);     //Will not work before frame is implemented.
-        palloc_free_page(pagedir_get_page(t->pagedir, p->addr));
+        //palloc_free_page(pagedir_get_page(t->pagedir, p->addr));
+        free_frame(p->frame->p_addr);
         pagedir_clear_page(t->pagedir, p->addr);
     }
     free(p);
@@ -68,8 +69,8 @@ bool spt_page_delete(struct hash* spt, struct page* p)
     if (e != NULL) {
         struct thread* t = thread_current();
         if (p->loaded) {
-            //palloc_free_page(p->frame->p_addr);     //Will not work before frame is implemented.
-            palloc_free_page(pagedir_get_page(t->pagedir, p->addr));
+            //palloc_free_page(pagedir_get_page(t->pagedir, p->addr));
+            free_frame(p->frame->p_addr);
             pagedir_clear_page(t->pagedir, p->addr);
         }
         free(p);
@@ -82,8 +83,7 @@ bool load_file(struct page* page, void* frame_addr)
 {
     file_seek (page->file, page->offset);
     //Load this page.
-    //if (file_read (page->file, frame_addr, page->read_bytes) != (int) page->read_bytes)
-    int read_bytes = file_read (page->file, frame_addr, page->read_bytes);// file_read_at(page->file, frame_addr, page->read_bytes, page->offset);
+    int read_bytes = file_read (page->file, frame_addr, page->read_bytes);
     if (read_bytes != (int) page->read_bytes)
     {
         return false; 

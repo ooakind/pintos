@@ -373,6 +373,7 @@ mapid_t mmap(int fd, void *addr)
     p->addr = addr;
     p->write = true;
     p->loaded = false;
+    p->frame = NULL;
     p->file = file_copy;
     p->offset = offset;
     p->read_bytes = PGSIZE > file_len ? file_len : PGSIZE;

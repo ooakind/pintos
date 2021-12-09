@@ -4,6 +4,7 @@
 #include <list.h>
 #include <hash.h>
 #include <debug.h>
+#include "vm/frame.h"
 
 typedef int mapid_t;
 enum page_type
@@ -21,7 +22,7 @@ struct page
     void* addr;
     bool write;
     bool loaded;
-    //struct frame* frame;
+    struct frame* frame;
     struct file* file;
     size_t offset;
     size_t read_bytes;
