@@ -27,6 +27,7 @@
 #include "threads/malloc.h"
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
  
 #define MAX_ARG_CNT 32
 
@@ -707,6 +708,10 @@ bool page_fault_handler(struct page* page)
   {
     result = load_file(page, frame->p_addr);
   }
+  else if (page->type == PAGE_SWAP)
+  {
+    result = swap_in(page->swap_elem, frame->p_addr);
+  }
   else 
   {
     result = false;
@@ -762,6 +767,6 @@ bool grow_stack(void *addr)
 
 bool check_sp(void *addr, void *esp)
 {
-  if((uint32_t *)addr > (uint32_t *)esp - 32 && (uint32_t *)addr > 0xC0000000 - 8 * 1024 * 1024 && is_user_vaddr(addr)) return true;
+  if((uint32_t *)addr > (uint32_t *)esp - 32 && (uintptr_t)addr > 0xC0000000 - 8 * 1024 * 1024 && is_user_vaddr(addr)) return true;
   return false;
 }
