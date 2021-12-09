@@ -157,7 +157,13 @@ page_fault (struct intr_frame *f)
   {
      bool result = page_fault_handler(p);
      if (!result)
-      exit(-1);
+     {
+        if(check_sp(fault_addr, f->esp))
+        {
+           grow_stack(fault_addr);
+        }
+        else exit(-1);
+     }
   }
   else   //Tried to write to read-only page.
   {

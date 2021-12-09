@@ -730,3 +730,38 @@ bool page_fault_handler(struct page* page)
 
   return true;
 }
+
+bool grow_stack(void *addr)
+{
+  void * vaddr = pg_round_down(addr);
+  struct frame *f;
+  struct page *p = (struct page*)malloc(sizeof(struct page));
+  if (p == NULL) return false;
+
+  f = allocate_frame(PAL_USER);
+  if (f == NULL) return false;
+
+  f->p_entry = p;
+
+  p->frame = f;
+  p->type = PAGE_STACK; // necessary?
+  p->addr = vaddr;
+  p->write = true;
+  p->loaded = true;
+  spt_page_insert(&thread_current()->spt, p);
+
+  if(!install_page(p->addr, f->p_addr, p->write)) 
+  {
+    free_frame(f->p_addr);
+    free(p);
+    return false;
+  }
+
+  return true;
+}
+
+bool check_sp(void *addr, void *esp)
+{
+  if((uint32_t *)addr > (uint32_t *)esp - 32 && (uint32_t *)addr > 0xC0000000 - 8 * 1024 * 1024 && is_user_vaddr(addr)) return true;
+  return false;
+}

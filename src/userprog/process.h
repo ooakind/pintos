@@ -18,5 +18,7 @@ void process_fd_close(int fd);
 
 /* Project 3 */
 bool page_fault_handler(struct page* page);
+bool grow_stack(void *addr);
+bool check_sp(void *addr, void *esp);
 
 #endif /* userprog/process.h */
